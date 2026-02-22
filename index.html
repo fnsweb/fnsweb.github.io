@@ -1,29 +1,110 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="ar">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quran Reader — القرآن الكريم</title>
-    <base href="/" />
-    <link rel="stylesheet" href="css/app.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="viewer.css" />
 </head>
-
 <body>
-    <div id="app">
-        <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#ccc;font-family:sans-serif;font-size:14px;">
-            Loading…
+
+<div id="app">
+
+    <!-- ══ TOOLBAR ══════════════════════════════════════════════════════════ -->
+    <div class="toolbar" id="toolbar">
+
+        <div class="tb-group">
+            <button class="btn btn-nav" id="btn-prev" title="Previous spread">◀</button>
+            <div class="page-info">
+                <span id="lbl-page">—</span>
+                <span class="sep"> / </span>
+                <span id="lbl-total">—</span>
+            </div>
+            <button class="btn btn-nav" id="btn-next" title="Next spread">▶</button>
         </div>
+
+        <div class="tb-group">
+            <input id="jump-input" class="page-jump" type="number" min="1"
+                   placeholder="Go to…" title="Type page number and press Enter" />
+        </div>
+
+        <div class="tb-group">
+            <label class="toggle-pill" title="Single / Double page">
+                <input type="checkbox" id="chk-twopage" checked />
+                <span class="pill-track"><span class="pill-thumb"></span></span>
+                <span class="pill-label">Two Pages</span>
+            </label>
+        </div>
+
+        <div class="tb-group">
+            <label class="toggle-pill" title="Right-to-Left layout">
+                <input type="checkbox" id="chk-rtl" checked />
+                <span class="pill-track"><span class="pill-thumb"></span></span>
+                <span class="pill-label">RTL &nbsp;عربی</span>
+            </label>
+        </div>
+
+    </div>
+    <!-- ══ END TOOLBAR ══════════════════════════════════════════════════════ -->
+
+    <!-- ══ CONTENT ══════════════════════════════════════════════════════════ -->
+    <div class="content-row">
+
+        <!-- Book area -->
+        <div class="scroll-area" id="scroll-area">
+
+            <!-- Visible spread (two page slots) -->
+            <div class="book-cover" id="book-cover">
+                <div class="pages-row" id="pages-row">
+
+                    <div class="page-slot" id="slot-a" data-page="1">
+                        <img class="pdf-canvas" id="img-a" src="pages/1.jpg" alt="Page 1" />
+                    </div>
+
+                    <div class="page-slot" id="slot-b" data-page="2">
+                        <img class="pdf-canvas" id="img-b" src="pages/2.jpg" alt="Page 2" />
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Hidden slots: preloaded images for the flip animation's
+                 back-face and destination lookups -->
+            <div id="preload-pool" aria-hidden="true">
+                <div class="page-slot" id="slot-pre0" data-page="-1"><img class="pdf-canvas" id="img-pre0" src="" /></div>
+                <div class="page-slot" id="slot-pre1" data-page="-1"><img class="pdf-canvas" id="img-pre1" src="" /></div>
+                <div class="page-slot" id="slot-pre2" data-page="-1"><img class="pdf-canvas" id="img-pre2" src="" /></div>
+                <div class="page-slot" id="slot-pre3" data-page="-1"><img class="pdf-canvas" id="img-pre3" src="" /></div>
+            </div>
+
+        </div>
+        <!-- ══ END SCROLL AREA ══ -->
+
+        <!-- Bookmark sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sb-header">
+                <span class="sb-title">Bookmarks</span>
+                <button class="sb-add-btn" id="btn-add-bm" title="Bookmark this page">＋</button>
+            </div>
+            <div class="sb-list" id="bm-user-list"></div>
+
+            <div class="sb-header sb-pdf-header" id="pdf-bm-header" style="display:none">
+                <span class="sb-title">PDF Bookmarks</span>
+            </div>
+            <div class="sb-list" id="bm-pdf-list"></div>
+        </aside>
+
+    </div>
+    <!-- ══ END CONTENT ══════════════════════════════════════════════════════ -->
+
+    <!-- ══ STATUS BAR ═══════════════════════════════════════════════════════ -->
+    <div class="status-bar" id="status-bar">
+        <span>القرآن الكريم — 13 Lines Indopak</span>
+        <span id="sb-page">Page 1</span>
     </div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
-    </div>
-    <script src="js/pdfInterop.js"></script>
-    <script src="_framework/blazor.webassembly.js"></script>
+</div><!-- #app -->
+
+<script src="viewer.js"></script>
 </body>
-
 </html>
