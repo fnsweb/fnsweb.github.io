@@ -23,12 +23,12 @@
             <button class="btn btn-nav" id="btn-next" title="Next spread">▶</button>
         </div>
 
-        <div class="tb-group">
+        <div class="tb-group" id="jump-input-group">
             <input id="jump-input" class="page-jump" type="number" min="1"
                    placeholder="Go to…" title="Type page number and press Enter" />
         </div>
 
-        <div class="tb-group">
+        <div class="tb-group" id="toggle-twopage-group">
             <label class="toggle-pill" title="Single / Double page">
                 <input type="checkbox" id="chk-twopage" checked />
                 <span class="pill-track"><span class="pill-thumb"></span></span>
@@ -36,13 +36,15 @@
             </label>
         </div>
 
-        <div class="tb-group">
+        <div class="tb-group" id="rtl-toggle-group">
             <label class="toggle-pill" title="Right-to-Left layout">
                 <input type="checkbox" id="chk-rtl" checked />
                 <span class="pill-track"><span class="pill-thumb"></span></span>
                 <span class="pill-label">RTL &nbsp;عربی</span>
             </label>
         </div>
+
+        <button class="btn btn-sidebar-toggle" id="btn-sidebar-toggle" title="Bookmarks">Bookmarks</button>
 
     </div>
     <!-- ══ END TOOLBAR ══════════════════════════════════════════════════════ -->
@@ -52,6 +54,11 @@
 
         <!-- Book area -->
         <div class="scroll-area" id="scroll-area">
+
+            <!-- Peek slot: shows bottom of previous page above the book -->
+            <div class="peek-slot peek-above" id="peek-above">
+                <img class="peek-img" id="peek-above-img" src="" alt="" />
+            </div>
 
             <!-- Visible spread (two page slots) -->
             <div class="book-cover" id="book-cover">
@@ -68,6 +75,11 @@
                 </div>
             </div>
 
+            <!-- Peek slot: shows top of next page below the book -->
+            <div class="peek-slot peek-below" id="peek-below">
+                <img class="peek-img" id="peek-below-img" src="" alt="" />
+            </div>
+
             <!-- Hidden slots: preloaded images for the flip animation's
                  back-face and destination lookups -->
             <div id="preload-pool" aria-hidden="true">
@@ -80,9 +92,14 @@
         </div>
         <!-- ══ END SCROLL AREA ══ -->
 
+        <!-- Backdrop: closes sidebar when tapped outside (mobile only) -->
+        <div class="sb-backdrop" id="sb-backdrop"></div>
+
         <!-- Bookmark sidebar -->
         <aside class="sidebar" id="sidebar">
-            <div class="sb-header">
+            <!-- Mobile strip handle — always-visible narrow edge, tap/swipe to expand -->
+            <div class="sb-strip" id="sb-strip"></div>
+            <div class="sb-header" id="user-bm-header">
                 <span class="sb-title">Bookmarks</span>
                 <button class="sb-add-btn" id="btn-add-bm" title="Bookmark this page">＋</button>
             </div>
@@ -104,6 +121,12 @@
     </div>
 
 </div><!-- #app -->
+
+<!-- Rotate-device overlay: shown on tablets in portrait orientation -->
+<div id="rotate-overlay">
+    <div class="rotate-graphic"></div>
+    <p>Rotate your device to landscape</p>
+</div>
 
 <script src="viewer.js"></script>
 </body>

@@ -25,14 +25,17 @@ const pagesRow = document.getElementById('pages-row');
 const preSlots = [0,1,2,3].map(i => document.getElementById(`slot-pre${i}`));
 const preImgs  = [0,1,2,3].map(i => document.getElementById(`img-pre${i}`));
 
-const btnPrev   = document.getElementById('btn-prev');
-const btnNext   = document.getElementById('btn-next');
-const lblPage   = document.getElementById('lbl-page');
-const lblTotal  = document.getElementById('lbl-total');
-const jumpInput = document.getElementById('jump-input');
-const sbPage    = document.getElementById('sb-page');
-const chkRTL    = document.getElementById('chk-rtl');
-const chkTwo    = document.getElementById('chk-twopage');
+const btnPrev          = document.getElementById('btn-prev');
+const btnNext          = document.getElementById('btn-next');
+const lblPage          = document.getElementById('lbl-page');
+const lblTotal         = document.getElementById('lbl-total');
+const jumpInput        = document.getElementById('jump-input');
+const sbPage           = document.getElementById('sb-page');
+const chkRTL           = document.getElementById('chk-rtl');
+const chkTwo           = document.getElementById('chk-twopage');
+const sidebar          = document.getElementById('sidebar');
+const sbBackdrop       = document.getElementById('sb-backdrop');
+const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
 
 // ══════════════════════════════════════════════════════════════════════════
 //  UTILITIES
@@ -55,6 +58,102 @@ function snapToSpreadStart(n) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  MOBILE HELPERS
+// ══════════════════════════════════════════════════════════════════════════
+const MOBILE_BP = 768;
+function isMobileView() { return window.innerWidth < MOBILE_BP; }
+
+function openSidebar() {
+    sidebar.classList.add('sb-open');
+    sbBackdrop.classList.add('sb-open');
+}
+
+function closeSidebar() {
+    sidebar.classList.remove('sb-open');
+    sbBackdrop.classList.remove('sb-open');
+}
+
+function toggleSidebar() {
+    if (sidebar.classList.contains('sb-open')) closeSidebar();
+    else openSidebar();
+}
+
+// Swipe up on the book area to go to next page; swipe down for previous.
+function setupPageSwipe() {
+    const area = document.getElementById('scroll-area');
+    let tx = null, ty = null;
+    area.addEventListener('touchstart', e => {
+        tx = e.touches[0].clientX;
+        ty = e.touches[0].clientY;
+    }, { passive: true });
+    area.addEventListener('touchend', e => {
+        if (ty === null) return;
+        const dx = e.changedTouches[0].clientX - tx;
+        const dy = e.changedTouches[0].clientY - ty;
+        tx = ty = null;
+        if (Math.abs(dx) > Math.abs(dy) * 1.2) return; // mostly horizontal — ignore
+        if (dy < -40) goToNext();  // swipe up   → next page
+        if (dy >  40) goToPrev();  // swipe down → previous page
+    }, { passive: true });
+}
+
+// Swipe left on the strip/sidebar to open; swipe right to close.
+function setupSidebarTouch() {
+    let tx = null, ty = null;
+    sidebar.addEventListener('touchstart', e => {
+        tx = e.touches[0].clientX;
+        ty = e.touches[0].clientY;
+    }, { passive: true });
+    sidebar.addEventListener('touchend', e => {
+        if (tx === null) return;
+        const dx = e.changedTouches[0].clientX - tx;
+        const dy = e.changedTouches[0].clientY - ty;
+        tx = ty = null;
+        if (Math.abs(dy) > Math.abs(dx) * 1.2) return; // mostly vertical — ignore
+        if (dx < -36) openSidebar();
+        if (dx >  36) closeSidebar();
+    }, { passive: true });
+}
+
+// Enforce single-page on mobile; restore user preference on desktop.
+// Called on init and whenever the viewport crosses the mobile breakpoint.
+function applyViewMode() {
+    if (isMobileView()) {
+        isTwoPage = false;
+        document.body.classList.add('single-page');
+        closeSidebar();
+    } else {
+        isTwoPage = chkTwo.checked;
+        document.body.classList.toggle('single-page', !isTwoPage);
+    }
+    currentPage = snapToSpreadStart(currentPage);
+    renderSpread();
+    checkAutoCollapse();
+}
+
+// Auto-collapse sidebar when the two-page spread overflows the scroll area;
+// auto-open it when there is room. No-op on mobile (uses transform slide).
+function checkAutoCollapse() {
+    if (isMobileView()) return;
+    function doCheck() {
+        const scrollArea = document.getElementById('scroll-area');
+        const bookCover  = document.getElementById('book-cover');
+        if (!scrollArea || !bookCover) return;
+        const bookW = bookCover.offsetWidth;
+        if (bookW === 0) return;   // images not yet laid out — skip
+        const sidebarW   = parseFloat(getComputedStyle(document.documentElement)
+                               .getPropertyValue('--sidebar-w')) || 270;
+        // Width available to the book when the sidebar is fully open
+        const openScrollW = window.innerWidth - sidebarW;
+        if (bookW <= openScrollW) openSidebar();
+        else                      closeSidebar();
+    }
+    requestAnimationFrame(doCheck);
+    // Re-check after images have had time to load and affect layout
+    setTimeout(() => requestAnimationFrame(doCheck), 400);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  IMAGE SIZING  — fit book to viewport
 // ══════════════════════════════════════════════════════════════════════════
 function updateBookHeight() {
@@ -67,7 +166,16 @@ function updateBookHeight() {
     document.documentElement.style.setProperty('--book-h', `${avail}px`);
 }
 
-window.addEventListener('resize', updateBookHeight);
+let _prevMobile = isMobileView();
+window.addEventListener('resize', () => {
+    updateBookHeight();
+    const nowMobile = isMobileView();
+    if (nowMobile !== _prevMobile) {
+        _prevMobile = nowMobile;
+        applyViewMode();
+    }
+    checkAutoCollapse(); // returns early on mobile; re-evaluates fit on desktop
+});
 
 // ══════════════════════════════════════════════════════════════════════════
 //  RENDERING
@@ -103,6 +211,17 @@ function renderSpread() {
     pageFlip.refresh();
     updateUI();
     preloadAdjacent();
+    updatePeek();
+}
+
+function updatePeek() {
+    const aboveImg = document.getElementById('peek-above-img');
+    const belowImg = document.getElementById('peek-below-img');
+    if (!aboveImg || !belowImg) return;
+    const prev = currentPage - 1;
+    const next = currentPage + (isTwoPage ? 2 : 1);
+    aboveImg.src = prev >= 1          ? pageUrl(prev) : '';
+    belowImg.src = next <= totalPages ? pageUrl(next) : '';
 }
 
 // ── Preload pool — supplies back/dest images for the flip animation ──────
@@ -177,6 +296,8 @@ const pageFlip = (() => {
     let ov         = null;
     let bMove      = null;
     let bUp        = null;
+    let bTouchMove = null;
+    let bTouchUp   = null;
 
     // ── Public: rebuild corner zones after every navigation ───────────────
     function refresh() {
@@ -222,24 +343,31 @@ const pageFlip = (() => {
 
         zone.addEventListener('mousedown', e => {
             e.preventDefault(); e.stopPropagation();
-            startDrag(e, slot, side, dir);
+            startDrag(e.clientX, slot, side, dir);
         });
+        zone.addEventListener('touchstart', e => {
+            e.preventDefault(); e.stopPropagation();
+            startDrag(e.touches[0].clientX, slot, side, dir);
+        }, { passive: false });
         slot.appendChild(zone);
     }
 
-    function startDrag(e, slot, side, dir) {
+    function startDrag(clientX, slot, side, dir) {
         try {
             active     = true;
             cornerSide = side;
             navDir     = dir;
-            startX     = e.clientX;
+            startX     = clientX;
             pageWidth  = slot.offsetWidth;
             buildOverlay(slot, slot.getBoundingClientRect(), side, dir);
             document.body.style.cursor     = 'grabbing';
             document.body.style.userSelect = 'none';
             bMove = onMove; bUp = onUp;
+            bTouchMove = onTouchMove; bTouchUp = onTouchEnd;
             document.addEventListener('mousemove', bMove);
             document.addEventListener('mouseup',   bUp);
+            document.addEventListener('touchmove', bTouchMove, { passive: false });
+            document.addEventListener('touchend',  bTouchUp);
         } catch (err) {
             console.warn('[Flip] startDrag:', err);
             active = false; ov = null;
@@ -434,6 +562,8 @@ const pageFlip = (() => {
         active = false;
         document.removeEventListener('mousemove', bMove);
         document.removeEventListener('mouseup',   bUp);
+        document.removeEventListener('touchmove', bTouchMove);
+        document.removeEventListener('touchend',  bTouchUp);
         document.body.style.cursor     = '';
         document.body.style.userSelect = '';
         try {
@@ -441,6 +571,30 @@ const pageFlip = (() => {
             else                                   cancelFlip();
         } catch (err) {
             console.warn('[Flip] onUp:', err);
+            removeOverlay();
+        }
+    }
+
+    function onTouchMove(e) {
+        if (!active || !ov) return;
+        e.preventDefault(); // prevent scroll while dragging the curl
+        applyProgress(calcProgress(e.touches[0].clientX));
+    }
+
+    function onTouchEnd(e) {
+        if (!active) return;
+        active = false;
+        document.removeEventListener('mousemove', bMove);
+        document.removeEventListener('mouseup',   bUp);
+        document.removeEventListener('touchmove', bTouchMove);
+        document.removeEventListener('touchend',  bTouchUp);
+        document.body.style.cursor     = '';
+        document.body.style.userSelect = '';
+        try {
+            if (calcProgress(e.changedTouches[0].clientX) >= 0.25) completeFlip();
+            else                                                      cancelFlip();
+        } catch (err) {
+            console.warn('[Flip] onTouchEnd:', err);
             removeOverlay();
         }
     }
@@ -527,6 +681,11 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════════════════════
 btnPrev.addEventListener('click', goToPrev);
 btnNext.addEventListener('click', goToNext);
+btnSidebarToggle.addEventListener('click', toggleSidebar);
+sbBackdrop.addEventListener('click', closeSidebar);
+document.getElementById('sb-strip').addEventListener('click', toggleSidebar);
+setupSidebarTouch();
+setupPageSwipe();
 
 jumpInput.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
@@ -540,10 +699,12 @@ chkRTL.addEventListener('change', () => {
 });
 
 chkTwo.addEventListener('change', () => {
+    if (isMobileView()) return;
     isTwoPage = chkTwo.checked;
     document.body.classList.toggle('single-page', !isTwoPage);
     currentPage = snapToSpreadStart(currentPage);
     renderSpread();
+    checkAutoCollapse();
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -569,8 +730,8 @@ function renderUserBookmarks() {
             <div class="bm-badge">${bm.page}</div>
             <span class="bm-label" title="${bm.label}">${bm.label}</span>
             <button class="bm-del" title="Delete">✕</button>`;
-        row.querySelector('.bm-label').addEventListener('click', () => goToPage(bm.page));
-        row.querySelector('.bm-badge').addEventListener('click', () => goToPage(bm.page));
+        row.querySelector('.bm-label').addEventListener('click', () => { goToPage(bm.page); if (isMobileView()) closeSidebar(); });
+        row.querySelector('.bm-badge').addEventListener('click', () => { goToPage(bm.page); if (isMobileView()) closeSidebar(); });
         row.querySelector('.bm-del').addEventListener('click', e => {
             e.stopPropagation();
             bmSave(bmLoad().filter(b => b.id !== bm.id));
@@ -607,7 +768,7 @@ async function loadPdfBookmarks() {
             row.innerHTML = `
                 <div class="bm-badge bm-pdf-badge">${bm.page}</div>
                 <span class="bm-label" title="${bm.title}">${bm.title}</span>`;
-            row.addEventListener('click', () => goToPage(bm.page));
+            row.addEventListener('click', () => { goToPage(bm.page); if (isMobileView()) closeSidebar(); });
             el.appendChild(row);
         });
     } catch { /* bookmarks.json not available yet */ }
@@ -629,13 +790,20 @@ async function loadMetadata() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  ORIENTATION LOCK  — request landscape on tablets/phones when supported
+//  (only works for installed PWAs / fullscreen; silently ignored otherwise)
+// ══════════════════════════════════════════════════════════════════════════
+if (screen.orientation?.lock) {
+    screen.orientation.lock('landscape').catch(() => {});
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════════════════════
 (async () => {
     await loadMetadata();
     updateBookHeight();
-    document.body.classList.toggle('single-page', !isTwoPage);
-    renderSpread();
+    applyViewMode();          // sets single-page on mobile, renders spread
     renderUserBookmarks();
     await loadPdfBookmarks();
 })();

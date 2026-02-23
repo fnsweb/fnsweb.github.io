@@ -5,6 +5,7 @@
     --toolbar-h: 52px;
     --status-h:  30px;
     --sidebar-w: 270px;
+    --strip-w:   32px;
     --bg:        #1a1a2e;
     --bg2:       #16213e;
     --surface:   #0f3460;
@@ -114,6 +115,48 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
     image-rendering: -webkit-optimize-contrast;
 }
 
+/* ── Adjacent-page peek slots ─────────────────────────────────────────── */
+/* Hidden in two-page mode; in single-page mode the scroll-area switches  */
+/* to a 3-row grid (1fr / auto / 1fr) so these slots automatically fill   */
+/* whatever empty space exists above and below the current page.           */
+.peek-slot {
+    display: none;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+    width: 100%;
+}
+/* Peek image: same dimensions as the main canvas so only the visible      */
+/* portion (clipped by overflow:hidden) shows — the bottom of the prev     */
+/* page above the book, and the top of the next page below it.             */
+.peek-img {
+    display: block;
+    height: var(--book-h, 80vh);
+    width: auto;
+    opacity: 0.45;
+    image-rendering: -webkit-optimize-contrast;
+}
+.peek-above .peek-img {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+}
+.peek-below .peek-img {
+    position: absolute; top: 0;    left: 50%; transform: translateX(-50%);
+}
+/* Soft gradient where the peek meets the current page */
+.peek-above::after,
+.peek-below::after {
+    content: ''; position: absolute; left: 0; right: 0;
+    height: 56px; pointer-events: none;
+}
+.peek-above::after {
+    bottom: 0;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+}
+.peek-below::after {
+    top: 0;
+    background: linear-gradient(to top, transparent, var(--bg));
+}
+
 /* ── Flip corner zones (injected by JS) ───────────────────────────────── */
 .flip-corner-zone {
     position: absolute; bottom: 0; width: 60px; height: 80px;
@@ -184,10 +227,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 /* ── Sidebar ──────────────────────────────────────────────────────────── */
 .sidebar {
-    flex: 0 0 var(--sidebar-w); display: flex; flex-direction: column;
+    position: relative;
+    flex: 0 0 auto; width: var(--strip-w);
+    display: flex; flex-direction: column;
     background: var(--bg2); border-left: 1px solid var(--border);
     overflow: hidden;
+    padding-left: var(--strip-w);
+    transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.sidebar.sb-open { width: var(--sidebar-w); }
 
 .sb-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -253,11 +301,137 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
     font-size: 12px; color: var(--text-dim);
 }
 
+/* ── Sidebar toggle button (desktop-only fallback, hidden everywhere now) */
+.btn-sidebar-toggle { display: none; }
+
+/* ── Sidebar strip (visible on all screen sizes) ──────────────────────── */
+.sb-strip {
+    display: flex;
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: var(--strip-w);
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 30, 58, 0.30);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    cursor: pointer;
+    z-index: 1;
+}
+.sb-strip::after {
+    content: '‹';
+    font-size: 15px;
+    color: rgba(255,255,255,0.35);
+    transition: transform 0.28s ease;
+    line-height: 1;
+}
+.sidebar.sb-open .sb-strip::after { transform: rotate(180deg); }
+
+/* ── Sidebar backdrop (mobile overlay to close sidebar) ───────────────── */
+.sb-backdrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 150;
+    background: rgba(0,0,0,0.45);
+}
+
+/* ── Mobile layout (phones ≤ 767px) ───────────────────────────────────── */
+@media (max-width: 767px) {
+    /* Toolbar: show only nav controls */
+    #toggle-twopage-group,
+    #jump-input-group,
+    #rtl-toggle-group,
+    .btn-sidebar-toggle { display: none; }
+
+    /* Sidebar: use transform-based slide on mobile (position: fixed) */
+    .sidebar {
+        position: fixed;
+        top: var(--toolbar-h); right: 0; bottom: var(--status-h);
+        width: var(--sidebar-w); flex: none;
+        z-index: 200; border-left: none;
+        transform: translateX(calc(100% - var(--strip-w)));
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .sidebar.sb-open { transform: translateX(0); }
+
+    /* Strip: add visible left border on mobile (sidebar has border-left: none) */
+    .sb-strip { border-left: 1px solid rgba(255,255,255,0.07); }
+    /* Page canvas: fit within visible viewport (no overflow behind the strip) */
+    .pdf-canvas,
+    .peek-img {
+        height: auto;
+        width: auto;
+        max-height: var(--book-h);
+        max-width: calc(100vw - var(--strip-w));
+    }
+
+    /* Backdrop visible when sidebar is fully open */
+    .sb-backdrop.sb-open { display: block; }
+
+    /* Hide user-added bookmarks; PDF bookmarks take the full sidebar height */
+    #user-bm-header,
+    #bm-user-list { display: none; }
+}
+
 /* ── Single-page mode ─────────────────────────────────────────────────── */
 body.single-page #slot-b { display: none; }
 body.single-page .pages-row::after { display: none; }
+
+/* Switch scroll-area to a 3-row grid: peek / book / peek.                 */
+/* The 1fr rows automatically absorb whatever vertical space the page      */
+/* doesn't use, so peek slots are only visible when there is empty space.  */
+body.single-page .scroll-area {
+    display: grid;
+    grid-template-rows: 1fr auto 1fr;
+    align-items: stretch; /* peek slots fill their row height */
+}
+body.single-page .book-cover  { justify-self: center; }  /* horizontal centering */
+body.single-page .peek-slot   { display: block; }
 
 /* ── Scrollbar styling ────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+/* ── Rotate-device overlay (tablets in portrait) ─────────────────────── */
+#rotate-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; color: var(--text-dim); font-size: 14px; text-align: center;
+}
+
+/* Show only on portrait screens wide enough to be a tablet (≥ 600px) */
+@media (orientation: portrait) and (min-width: 600px) {
+    #rotate-overlay { display: flex; }
+}
+
+/* Animated phone-to-landscape graphic */
+.rotate-graphic {
+    width: 48px; height: 78px;
+    border: 3px solid var(--text-dim);
+    border-radius: 10px;
+    position: relative;
+    animation: rotate-to-landscape 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    transform-origin: center center;
+}
+/* Home button dot */
+.rotate-graphic::before {
+    content: '';
+    position: absolute; bottom: 7px; left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 10px;
+    border-radius: 50%; background: var(--text-dim);
+}
+/* Camera dot */
+.rotate-graphic::after {
+    content: '';
+    position: absolute; top: 7px; left: 50%;
+    transform: translateX(-50%);
+    width: 6px; height: 6px;
+    border-radius: 50%; background: var(--text-dim);
+}
+@keyframes rotate-to-landscape {
+    0%, 25%  { transform: rotate(0deg); }
+    65%, 100% { transform: rotate(90deg); }
+}
